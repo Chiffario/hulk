@@ -126,7 +126,7 @@ pub fn wayland_loop(
     initial_index: usize,
     initial_gamma: f32,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    std::fs::remove_file(SOCKET_PATH)?;
+    let _ = std::fs::remove_file(SOCKET_PATH);
     // Create basic connections
     let conn = Connection::connect_to_env()?;
     let mut event_queue = conn.new_event_queue();
@@ -134,7 +134,7 @@ pub fn wayland_loop(
 
     // Initialize a registry
     let display = conn.display();
-    let registry = display.get_registry(&qh, ());
+    let _ = display.get_registry(&qh, ());
     let mut state = AppData::new();
 
     // Get globals
@@ -150,8 +150,6 @@ pub fn wayland_loop(
         return Ok(());
     };
 
-    println!("Found {} output(s)", state.outputs.len());
-
     if initial_index >= state.outputs.len() {
         eprintln!("Output index {} not available", initial_index);
         return Ok(());
@@ -166,7 +164,6 @@ pub fn wayland_loop(
 
     let path = SOCKET_PATH;
     std::fs::create_dir_all(Path::new(path).parent().unwrap())?;
-    println!("Connecting to fifo");
     let stream = UnixListener::bind(path)?;
     println!("Connected to stream {:?}", stream.local_addr()?);
     let mut buffer = String::new();
@@ -199,7 +196,6 @@ fn set_gamma(
 
     // Get gamma control for the output
     let gamma_control = gamma_manager.get_gamma_control(output, &queue_handle, ());
-    println!("Got gamma control {:?}", gamma_control);
     state.gamma_control = Some(gamma_control);
 
     // Wait for gamma_size event
@@ -214,9 +210,6 @@ fn set_gamma(
 
     // Wait for the compositor to process the gamma change
     event_queue.roundtrip(&mut state)?;
-
-    // Wait for user input because I cba locking this in other ways
-    println!("Gamma applied successfully");
     Ok(())
 }
 

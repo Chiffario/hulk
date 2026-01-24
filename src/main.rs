@@ -25,12 +25,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let gamma = cli.gamma.unwrap_or(1.0);
 
     if let Ok(mut socket) = UnixStream::connect(SOCKET_PATH) {
-        println!("Opening socket");
         let message = IpcMessage {
             output: Some(monitor),
             gamma: Some(gamma),
         };
-        println!("Writing {message:?} to socket");
+        println!("Setting gamma to {gamma} for output {monitor}");
         write!(socket, "{}", ron::ser::to_string(&message)?)?;
     } else {
         wayland_loop(monitor, gamma)?;
