@@ -68,15 +68,14 @@ impl AppData {
 
         // Prepare gamma table data
         let mut data = Vec::new();
-        for i in 0..self.ramp_size as usize {
-            data.extend_from_slice(&red[i].to_ne_bytes());
-        }
-        for i in 0..self.ramp_size as usize {
-            data.extend_from_slice(&green[i].to_ne_bytes());
-        }
-        for i in 0..self.ramp_size as usize {
-            data.extend_from_slice(&blue[i].to_ne_bytes());
-        }
+        let mut extend = |color: &[u16]| {
+            for i in color.iter().take(self.ramp_size as usize) {
+                data.extend_from_slice(&i.to_ne_bytes());
+            }
+        };
+        extend(&red);
+        extend(&green);
+        extend(&blue);
         Ok(data)
     }
 
@@ -163,6 +162,7 @@ impl Dispatch<ZwlrGammaControlV1, ()> for AppData {
     }
 }
 
+/// some magic logic I stole
 fn create_gamma_ramp(size: usize, gamma: impl Into<f32>) -> (Vec<u16>, Vec<u16>, Vec<u16>) {
     let gamma = gamma.into();
     let mut red = Vec::with_capacity(size);
