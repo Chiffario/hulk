@@ -43,26 +43,55 @@ impl AppData {
         }
     }
 
+    fn reset_gamma_control(&mut self, output_idx: usize, queue_handle: &QueueHandle<AppData>) -> Result<(), Box<dyn std::error::Error>> {
+        // Destroy current gamma control
+        let output = self.outputs.get(output_idx).ok_or("Invalid output")?;
+        let control = self.gamma_control.take();
+        if let Some(c) = control {
+            c.destroy();
+        }
+
+        // Get gamma control for the output
+        let gamma_manager = self.gamma_manager.as_ref().ok_or("No gamma manager")?;
+        let gamma_control = gamma_manager.get_gamma_control(output, queue_handle, ());
+        self.gamma_control = Some(gamma_control);
+        Ok(())
+    }
+    fn prepare_data(&self, gamma: f32) -> Result<Vec<u8>, Errors> {
+        if self.ramp_size == 0 {
+            eprintln!("Failed to get gamma ramp size");
+            return Err(Errors::GammaRampError);
+        }
+
+        // Create gamma ramp
+        let (red, green, blue) = create_gamma_ramp(self.ramp_size as usize, gamma);
+
+        // Prepare gamma table data
+        let mut data = Vec::new();
+        for i in 0..self.ramp_size as usize {
+            data.extend_from_slice(&red[i].to_ne_bytes());
+        }
+        for i in 0..self.ramp_size as usize {
+            data.extend_from_slice(&green[i].to_ne_bytes());
+        }
+        for i in 0..self.ramp_size as usize {
+            data.extend_from_slice(&blue[i].to_ne_bytes());
+        }
+        Ok(data)
+    }
+
     fn set_gamma(&mut self,
         gamma: f32,
         output_idx: usize,
         queue_handle: &QueueHandle<AppData>,
         event_queue: &mut EventQueue<AppData>,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let output = self.outputs.get(output_idx).ok_or("Invalid output")?;
-        let control = self.gamma_control.take();
-        if let Some(c) = control {
-            c.destroy();
-        };
-        let gamma_manager = self.gamma_manager.as_ref().ok_or("No gamma manager")?;
-
-        // Get gamma control for the output
-        let gamma_control = gamma_manager.get_gamma_control(output, &queue_handle, ());
-        self.gamma_control = Some(gamma_control);
+        self.reset_gamma_control(output_idx, queue_handle)?;
 
         // Wait for gamma_size event
         event_queue.roundtrip(self)?;
-        let data = prepare_data(self, gamma)?;
+
+        let data = self.prepare_data(gamma)?;
         let mfd = prepare_fd(&data)?;
         if let Some(ref control) = self.gamma_control {
             // SAFETY: mfd should be valid throughout the process
@@ -191,16 +220,14 @@ pub fn wayland_loop(
     println!("Connected to stream {:?}", stream.local_addr()?);
 
     let mut buffer = String::new();
-    for stream in stream.incoming() {
-        if let Ok(mut msg) = stream {
-            let _ = msg.read_to_string(&mut buffer);
-            let message: IpcMessage = ron::from_str(&buffer)?;
-            println!("Received message: {message:?}");
-            buffer.clear();
-            let gamma = message.gamma.unwrap_or(initial_gamma);
-            let output = message.output.unwrap_or(initial_index);
-            state.set_gamma(gamma, output, &qh, &mut event_queue)?;
-        }
+    for mut msg in stream.incoming().flatten() {
+        let _ = msg.read_to_string(&mut buffer);
+        let message: IpcMessage = ron::from_str(&buffer)?;
+        println!("Received message: {message:?}");
+        buffer.clear();
+        let gamma = message.gamma.unwrap_or(initial_gamma);
+        let output = message.output.unwrap_or(initial_index);
+        state.set_gamma(gamma, output, &qh, &mut event_queue)?;
     }
     Ok(())
 }
@@ -218,28 +245,6 @@ impl Display for Errors {
 }
 impl std::error::Error for Errors {}
 
-fn prepare_data(state: &AppData, gamma: f32) -> Result<Vec<u8>, Errors> {
-    if state.ramp_size == 0 {
-        eprintln!("Failed to get gamma ramp size");
-        return Err(Errors::GammaRampError);
-    }
-
-    // Create gamma ramp
-    let (red, green, blue) = create_gamma_ramp(state.ramp_size as usize, gamma);
-
-    // Prepare gamma table data
-    let mut data = Vec::new();
-    for i in 0..state.ramp_size as usize {
-        data.extend_from_slice(&red[i].to_ne_bytes());
-    }
-    for i in 0..state.ramp_size as usize {
-        data.extend_from_slice(&green[i].to_ne_bytes());
-    }
-    for i in 0..state.ramp_size as usize {
-        data.extend_from_slice(&blue[i].to_ne_bytes());
-    }
-    Ok(data)
-}
 
 fn prepare_fd(data: &[u8]) -> Result<Memfd, Box<dyn std::error::Error>> {
     let opts = memfd::MemfdOptions::default().allow_sealing(true);
@@ -249,7 +254,7 @@ fn prepare_fd(data: &[u8]) -> Result<Memfd, Box<dyn std::error::Error>> {
     {
         let mut file = mfd.as_file();
         file.seek(SeekFrom::Start(0))?;
-        file.write_all(&data)?;
+        file.write_all(data)?;
         file.seek(SeekFrom::Start(0))?;
         file.flush()?;
     }
