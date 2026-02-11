@@ -42,6 +42,39 @@ impl AppData {
             gamma_applied: false,
         }
     }
+
+    fn set_gamma(&mut self,
+        gamma: f32,
+        output_idx: usize,
+        queue_handle: &QueueHandle<AppData>,
+        event_queue: &mut EventQueue<AppData>,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let output = self.outputs.get(output_idx).ok_or("Invalid output")?;
+        let control = self.gamma_control.take();
+        if let Some(c) = control {
+            c.destroy();
+        };
+        let gamma_manager = self.gamma_manager.as_ref().ok_or("No gamma manager")?;
+
+        // Get gamma control for the output
+        let gamma_control = gamma_manager.get_gamma_control(output, &queue_handle, ());
+        self.gamma_control = Some(gamma_control);
+
+        // Wait for gamma_size event
+        event_queue.roundtrip(self)?;
+        let data = prepare_data(self, gamma)?;
+        let mfd = prepare_fd(&data)?;
+        if let Some(ref control) = self.gamma_control {
+            // SAFETY: mfd should be valid throughout the process
+            control.set_gamma(unsafe { BorrowedFd::borrow_raw(mfd.as_file().as_raw_fd()) });
+            println!("Setting gamma to {} for output {}", gamma, output_idx);
+        }
+
+        // Wait for the compositor to process the gamma change
+        event_queue.roundtrip(self)?;
+        Ok(())
+
+    }
 }
 
 impl Dispatch<wl_registry::WlRegistry, ()> for AppData {
@@ -150,18 +183,13 @@ pub fn wayland_loop(
         eprintln!("Output index {} not available", initial_index);
         return Ok(());
     }
-    set_gamma(
-        &mut state,
-        initial_gamma,
-        initial_index,
-        &qh,
-        &mut event_queue,
-    )?;
+    state.set_gamma(initial_gamma, initial_index, &qh, &mut event_queue)?;
 
     let path = SOCKET_PATH;
     std::fs::create_dir_all(Path::new(path).parent().unwrap())?;
     let stream = UnixListener::bind(path)?;
     println!("Connected to stream {:?}", stream.local_addr()?);
+
     let mut buffer = String::new();
     for stream in stream.incoming() {
         if let Ok(mut msg) = stream {
@@ -176,6 +204,7 @@ pub fn wayland_loop(
     }
     Ok(())
 }
+
 fn set_gamma(
     mut state: &mut AppData,
     gamma: f32,
