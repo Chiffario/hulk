@@ -199,42 +199,9 @@ pub fn wayland_loop(
             buffer.clear();
             let gamma = message.gamma.unwrap_or(initial_gamma);
             let output = message.output.unwrap_or(initial_index);
-            set_gamma(&mut state, gamma, output, &qh, &mut event_queue)?;
+            state.set_gamma(gamma, output, &qh, &mut event_queue)?;
         }
     }
-    Ok(())
-}
-
-fn set_gamma(
-    mut state: &mut AppData,
-    gamma: f32,
-    output_idx: usize,
-    queue_handle: &QueueHandle<AppData>,
-    event_queue: &mut EventQueue<AppData>,
-) -> Result<(), Box<dyn std::error::Error>> {
-    let output = &state.outputs.get(output_idx).ok_or("Invalid output")?;
-    let control = state.gamma_control.take();
-    if let Some(c) = control {
-        c.destroy();
-    };
-    let gamma_manager = &state.gamma_manager.as_ref().ok_or("No gamma manager")?;
-
-    // Get gamma control for the output
-    let gamma_control = gamma_manager.get_gamma_control(output, &queue_handle, ());
-    state.gamma_control = Some(gamma_control);
-
-    // Wait for gamma_size event
-    event_queue.roundtrip(&mut state)?;
-    let data = prepare_data(&state, gamma)?;
-    let mfd = prepare_fd(&data)?;
-    if let Some(control) = &state.gamma_control {
-        // SAFETY: mfd should be valid throughout the process
-        control.set_gamma(unsafe { BorrowedFd::borrow_raw(mfd.as_file().as_raw_fd()) });
-        println!("Setting gamma to {} for output {}", gamma, output_idx);
-    }
-
-    // Wait for the compositor to process the gamma change
-    event_queue.roundtrip(&mut state)?;
     Ok(())
 }
 
