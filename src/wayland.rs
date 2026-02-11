@@ -66,7 +66,7 @@ impl AppData {
         let mfd = prepare_fd(&data)?;
         if let Some(ref control) = self.gamma_control {
             // SAFETY: mfd should be valid throughout the process
-            control.set_gamma(unsafe { BorrowedFd::borrow_raw(mfd.as_file().as_raw_fd()) });
+            control.set_gamma(unsafe { BorrowedFd::borrow_raw(mfd.as_raw_fd()) });
             println!("Setting gamma to {} for output {}", gamma, output_idx);
         }
 
