@@ -1,0 +1,15 @@
+[Unit]
+Description=Hulk (gamma daemon)
+After=graphical.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/share/cargo/bin/hulk
+Restart=on-failure
+RestartSec=10s
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=hulk
+
+[Install]
+WantedBy=default.target

@@ -3,7 +3,7 @@ name = "hulk-gamma"
 description = "A Linux CLI-daemon for gamma controls"
 license = "GPL-3.0-or-later"
 repository = "https://github.com/Chiffario/hulk"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 
 # I hate hulk-gamma as a name so just overriding it lol
