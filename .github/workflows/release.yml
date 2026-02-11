@@ -1,0 +1,32 @@
+name: Release
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+    - '[0-9]+.[0-9]+'
+    - '[0-9]+.[0-9]+.[0-9]+'
+
+jobs:
+  prepare-release:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    
+    steps:
+      - name: Update Rust
+        run: rustup update stable
+      - name: Checkout code
+        uses: actions/checkout@v3
+      - name: Run cargo check
+        run: cargo check --verbose
+      - name: Run cargo clippy
+        run: cargo clippy --all-features --all-targets -- -Dwarnings
+      - name: Build Release
+        run: cargo build --release
+      - name: Upload artifacts linux
+        uses: actions/upload-artifact@v4
+        with:
+          name: hulk-x86_64
+          path: target/release/hulk
+          retention-days: 5
