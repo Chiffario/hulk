@@ -1,5 +1,5 @@
 use std::io::Write;
-use std::{fs::File, os::unix::net::UnixStream};
+use std::os::unix::net::UnixStream;
 
 use clap::Parser;
 
@@ -14,8 +14,6 @@ struct Cli {
     monitor: Option<usize>,
     #[arg(short, long)]
     gamma: Option<f32>,
-    #[arg(short, long)]
-    daemon: bool,
 }
 
 pub const SOCKET_PATH: &str = "/tmp/hulk-gamma/fifo.sock";

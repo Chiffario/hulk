@@ -1,30 +1,26 @@
 use memfd::Memfd;
 use std::{
-    fmt::{Display, write},
-    fs::File,
-    io::{BufRead, Read, Seek, SeekFrom, Write, stdin},
+    fmt::Display,
+    io::{Read, Seek, SeekFrom, Write},
     os::{
-        fd::{AsFd, BorrowedFd, OwnedFd},
+        fd::BorrowedFd,
         unix::{
-            io::{AsRawFd, FromRawFd},
-            net::{UnixListener, UnixStream},
+            io::AsRawFd,
+            net::UnixListener,
         },
     },
     path::Path,
 };
 use wayland_client::{
-    Connection, Dispatch, EventQueue, Proxy, QueueHandle, delegate_noop,
+    Connection, Dispatch, EventQueue, QueueHandle, delegate_noop,
     protocol::{wl_output, wl_registry},
 };
 use wayland_protocols_wlr::{
     self,
-    gamma_control::{
-        self,
-        v1::client::{
+    gamma_control::v1::client::{
             zwlr_gamma_control_manager_v1::ZwlrGammaControlManagerV1,
             zwlr_gamma_control_v1::{self, ZwlrGammaControlV1},
         },
-    },
 };
 
 use crate::{SOCKET_PATH, message::IpcMessage};
@@ -145,7 +141,7 @@ pub fn wayland_loop(
         return Ok(());
     }
 
-    let Some(gamma_manager) = &state.gamma_manager else {
+    let Some(_gamma_manager) = &state.gamma_manager else {
         eprintln!("Compositor doesn't support wlr-gamma-control protocol");
         return Ok(());
     };
