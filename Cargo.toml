@@ -6,6 +6,11 @@ repository = "https://github.com/Chiffario/hulk"
 version = "0.1.0"
 edition = "2024"
 
+# I hate hulk-gamma as a name so just overriding it lol
+[[bin]]
+name = "hulk"
+path = "src/main.rs"
+
 [dependencies]
 apply = "0.3.0"
 clap = { version = "4.5.54", features = ["derive"] }
